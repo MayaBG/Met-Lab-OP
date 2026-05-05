@@ -4,7 +4,7 @@
 
 ### 🚀 איך משתמשים?
 הכלי נגיש כאתר אינטרנט ידידותי בקישור הבא:
-[https://meteorology-lab.streamlit.app/
+  https://meteorology-lab.streamlit.app/
 
 ### 📊 מה ניתן להפיק?
 * **מפת קרקע:** לחץ פני הים (MSLP) ודגלוני רוח.
