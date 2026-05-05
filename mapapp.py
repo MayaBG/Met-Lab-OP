@@ -7,30 +7,31 @@ import numpy as np
 from datetime import datetime
 import matplotlib.colors as mcolors
 
-# הגדרות עמוד
+# הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
 
-st.title("🌍 מחולל מפות סינופטיות")
-st.markdown("### Source: NCEP/NCAR Reanalysis")
+st.title("🌍 מחולל מפות סינופטיות - מעבדה")
+st.markdown("### מערכת הפקת מפות מבוססת נתוני NCEP/NCAR Reanalysis")
 
-# סרגל צד להגדרות
+# סרגל צד להגדרות המשתמש
 st.sidebar.header("הגדרות הפקה")
 
 year = st.sidebar.slider("שנה", 1979, 2026, 2024)
 month = st.sidebar.slider("חודש", 1, 12, 1)
 day = st.sidebar.slider("יום", 1, 31, 10)
 
-# עדכון השעות לתיבת בחירה קבועה
+# בחירת שעה מתוך רשימה קבועה למניעת שגיאות בשרת
 hour = st.sidebar.selectbox("שעה (UTC)", [0, 6, 12, 18], index=2)
 
 map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb"])
 
 if st.sidebar.button("הפק מפה"):
-    with st.spinner('מושך נתונים מהשרת...'):
+    with st.spinner('מושך נתונים משרתי NOAA...'):
         try:
             target_dt = datetime(year, month, day, hour)
             day_idx = target_dt.timetuple().tm_yday - 1
             
+            # הגדרת כתובות הנתונים
             urls = {
                 'slp': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/surface/slp.{year}.nc",
                 'hgt': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/pressure/hgt.{year}.nc",
@@ -39,23 +40,34 @@ if st.sidebar.button("הפק מפה"):
                 'vwnd': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/surface/vwnd.sig995.{year}.nc"
             }
 
-            fig = plt.figure(figsize=(12, 8))
+            # יצירת המפה
+            fig = plt.figure(figsize=(14, 10))
             ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
             
-            # הגדרות האזור לבקשתך: 20-40 צפון, 20-50 מזרח
+            # הגדרת אזור: 20-40 צפון, 20-50 מזרח
             ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
             
+            # הוספת שכבות גאוגרפיות
             ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.5)
             ax.add_feature(cfeature.BORDERS, linestyle=':')
             gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.6)
             gl.top_labels = False
             gl.right_labels = False
 
+            # הכנת טקסט לכותרת הפנימית
+            map_info = {
+                'surface': "Surface MSLP (hPa) & Wind Barbs",
+                '500mb': "500hPa Geopotential Height (m)",
+                '850mb': "850hPa Temperature (°C)"
+            }
+            title_text = f"{map_info[map_type]}\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: NCEP/NCAR Reanalysis"
+
+            # לוגיקת ציור לפי סוג מפה
             if map_type == 'surface':
                 ds_slp = xr.open_dataset(urls['slp'])
                 slp = ds_slp['slp'].isel(time=day_idx).sel(lat=slice(40, 20), lon=slice(20, 50)) / 100.0
                 
-                # שיידינג לבן לסימטריה
+                # שיידינג לבן לשמירה על פרופורציות
                 white_cmap = mcolors.ListedColormap(['white'])
                 cf = ax.contourf(slp.lon, slp.lat, slp, cmap=white_cmap, levels=[slp.min(), slp.max()])
                 plt.colorbar(cf, orientation='horizontal', pad=0.08, aspect=40).ax.set_visible(False)
@@ -63,12 +75,12 @@ if st.sidebar.button("הפק מפה"):
                 cntr = ax.contour(slp.lon, slp.lat, slp, colors='black', levels=np.arange(980, 1040, 2))
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
                 
+                # רוחות קרקע
                 ds_u = xr.open_dataset(urls['uwnd'])
                 ds_v = xr.open_dataset(urls['vwnd'])
                 u = ds_u['uwnd'].isel(time=day_idx).sel(lat=slice(40, 20), lon=slice(20, 50))
                 v = ds_v['vwnd'].isel(time=day_idx).sel(lat=slice(40, 20), lon=slice(20, 50))
                 ax.barbs(u.lon[::1], u.lat[::1], u.values[::1, ::1], v.values[::1, ::1], length=6, color='darkblue')
-                st.write(f"### Surface MSLP & Winds | {target_dt}")
 
             elif map_type == '850mb':
                 ds_air = xr.open_dataset(urls['air'])
@@ -77,7 +89,6 @@ if st.sidebar.button("הפק מפה"):
                 plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
                 cntr = ax.contour(temp.lon, temp.lat, temp, colors='black', levels=np.arange(-15, 35, 2), linewidths=0.8)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
-                st.write(f"### 850hPa Temperature | {target_dt}")
 
             elif map_type == '500mb':
                 ds_hgt = xr.open_dataset(urls['hgt'])
@@ -86,9 +97,12 @@ if st.sidebar.button("הפק מפה"):
                 plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
                 cntr = ax.contour(hgt.lon, hgt.lat, hgt, colors='white', linewidths=1.2, levels=np.arange(5100, 6000, 60))
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
-                st.write(f"### 500hPa Geopotential Height | {target_dt}")
 
+            # הוספת הכותרת לתוך קובץ התמונה
+            plt.title(title_text, fontsize=14, pad=20)
+            
+            # הצגת המפה בתוך האתר
             st.pyplot(fig)
             
         except Exception as e:
-            st.error(f"שגיאה במשיכת נתונים: וודאו שהתאריך תקין וקיים במאגר. (Error: {e})")
+            st.error(f"שגיאה בהפקת המפה. ייתכן שהנתונים לתאריך זה עדיין לא עודכנו בשרת. (קוד שגיאה: {e})")
