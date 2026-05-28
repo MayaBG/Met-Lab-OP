@@ -37,16 +37,15 @@ if st.sidebar.button("הפק מפה"):
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
             cds_key = st.secrets["CDS_KEY"]
             
-            # הגדרת החיבור הרשמי עם ביטול בדיקת SSL קפדנית (פותר את ה-SSLError)
+            # הגדרת החיבור הרשמי עם ביטול בדיקת SSL
             c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api", key=cds_key, verify=False)
             
-            # הגדרת קובץ זמני לשמירת הנתונים שיורדים מהשרת
             temp_filename = "era5_temp.nc"
             
-            # הגדרת הפרמטרים לבקשת הנתונים לפי סוג המפה
+            # עדכון שמות המאגרים לפורמט ה-Beta החדש (בלי הקידומת reanalysis-)
             if map_type == 'surface':
                 c.retrieve(
-                    'reanalysis-era5-single-levels',
+                    'era5-single-levels',
                     {
                         'product_type': 'reanalysis',
                         'format': 'netcdf',
@@ -68,7 +67,7 @@ if st.sidebar.button("הפק מפה"):
                 lev_val = '850' if map_type == '850mb' else '500'
                 
                 c.retrieve(
-                    'reanalysis-era5-pressure-levels',
+                    'era5-pressure-levels',
                     {
                         'product_type': 'reanalysis',
                         'format': 'netcdf',
@@ -127,7 +126,6 @@ if st.sidebar.button("הפק מפה"):
             plt.title(title_text, fontsize=14, pad=20)
             st.pyplot(fig)
             
-            # ניקוי הקובץ הזמני בסיום
             ds.close()
             if os.path.exists(temp_filename):
                 os.remove(temp_filename)
