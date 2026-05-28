@@ -5,7 +5,7 @@ import cartopy.feature as cfeature
 import xarray as xr
 import numpy as np
 from datetime import datetime
-import matplotlib.colors mcolors
+import matplotlib.colors as mcolors
 import cdsapi
 import os
 import urllib3
