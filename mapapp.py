@@ -5,7 +5,7 @@ import cartopy.feature as cfeature
 import xarray as xr
 import numpy as np
 from datetime import datetime
-import matplotlib.colors as mcolors
+import matplotlib.colors mcolors
 import cdsapi
 import os
 import urllib3
@@ -42,18 +42,21 @@ if st.sidebar.button("הפק מפה"):
             
             temp_filename = "era5_temp.nc"
             
-            # עדכון שמות המאגרים לפורמט ה-Beta החדש (בלי הקידומת reanalysis-)
+            # התאמה מלאה למבנה הפניות החדש של cds-beta
             if map_type == 'surface':
                 c.retrieve(
                     'era5-single-levels',
                     {
-                        'product_type': 'reanalysis',
-                        'format': 'netcdf',
-                        'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
-                        'year': str(year),
-                        'month': f"{month:02d}",
-                        'day': f"{day:02d}",
-                        'time': f"{hour:02d}:00",
+                        'destinationData': {
+                            'dataset': 'reanalysis-era5-single-levels',
+                            'product_type': 'reanalysis',
+                            'format': 'netcdf',
+                            'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
+                            'year': str(year),
+                            'month': f"{month:02d}",
+                            'day': f"{day:02d}",
+                            'time': f"{hour:02d}:00",
+                        }
                     },
                     temp_filename)
                 
@@ -69,14 +72,17 @@ if st.sidebar.button("הפק מפה"):
                 c.retrieve(
                     'era5-pressure-levels',
                     {
-                        'product_type': 'reanalysis',
-                        'format': 'netcdf',
-                        'variable': var_name,
-                        'pressure_level': lev_val,
-                        'year': str(year),
-                        'month': f"{month:02d}",
-                        'day': f"{day:02d}",
-                        'time': f"{hour:02d}:00",
+                        'destinationData': {
+                            'dataset': 'reanalysis-era5-pressure-levels',
+                            'product_type': 'reanalysis',
+                            'format': 'netcdf',
+                            'variable': var_name,
+                            'pressure_level': lev_val,
+                            'year': str(year),
+                            'month': f"{month:02d}",
+                            'day': f"{day:02d}",
+                            'time': f"{hour:02d}:00",
+                        }
                     },
                     temp_filename)
                 
