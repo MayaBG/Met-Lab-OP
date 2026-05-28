@@ -5,3 +5,4 @@ xarray
 numpy
 netCDF4
 scipy
+cdsapi
