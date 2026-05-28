@@ -103,29 +103,30 @@ if st.sidebar.button("הפק מפה"):
                 white_cmap = mcolors.ListedColormap(['white'])
                 cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=2)
                 
+                # תיקון: הסרת הפרמטר weight שגרם לקריסה
                 cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=3)
-                ax.clabel(cntr, inline=True, fmt='%i', fontsize=11, weight='bold')
+                ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
                 
+                # דילול דגלי הרוח (כל 5 נקודות) למניעת צפיפות
                 ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], 
                          length=5.5, color='#1b3a4b', linewidth=0.9, zorder=4)
 
             elif map_type == '850mb':
                 temp = ds['t'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() - 273.15
                 
-                # החלקה גאוסאנית עדינה על שדה הטמפרטורה (sigma=1.2 נותן קווים עגולים וחלקים)
+                # החלקה גאוסאנית עדינה על שדה הטמפרטורה
                 temp_smoothed = gaussian_filter(temp.values, sigma=1.2)
                 
                 cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=2)
                 plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
                 
-                # ציור קווי המתאר המוחלקים
                 cntr = ax.contour(temp.longitude, temp.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.0, zorder=3)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             elif map_type == '500mb':
                 hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 9.80665
                 
-                # החלקת הגובה הגיאופוטנציאלי ברום לזרימה נקייה ומקצועית
+                # החלקת הגובה הגיאופוטנציאלי ברום לזרימה נקייה
                 hgt_smoothed = gaussian_filter(hgt.values, sigma=1.0)
                 
                 cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=2)
