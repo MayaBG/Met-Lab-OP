@@ -53,9 +53,10 @@ if st.sidebar.button("הפק מפה"):
                     temp_filename)
                 
                 ds = xr.open_dataset(temp_filename)
-                slp = ds['msl'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) / 100.0
-                u = ds['u10'].sel(latitude=slice(40, 20), longitude=slice(20, 50))
-                v = ds['v10'].sel(latitude=slice(40, 20), longitude=slice(20, 50))
+                # הוספת squeeze() להפיכת המערך לדו-מימדי (2D) כפי שנדרש בציור
+                slp = ds['msl'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 100.0
+                u = ds['u10'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze()
+                v = ds['v10'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze()
                 
             else:
                 var_name = 'temperature' if map_type == '850mb' else 'geopotential'
@@ -105,14 +106,16 @@ if st.sidebar.button("הפק מפה"):
                 ax.barbs(u.longitude[::2], u.latitude[::2], u.values[::2, ::2], v.values[::2, ::2], length=6, color='darkblue')
 
             elif map_type == '850mb':
-                temp = ds['t'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) - 273.15
+                # הוספת squeeze() למפות הרום
+                temp = ds['t'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() - 273.15
                 cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both')
                 plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
                 cntr = ax.contour(temp.longitude, temp.latitude, temp, colors='black', levels=np.arange(-15, 35, 2), linewidths=0.8)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             elif map_type == '500mb':
-                hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) / 9.80665
+                # הוספת squeeze() למפות הרום
+                hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 9.80665
                 cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both')
                 plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
                 cntr = ax.contour(hgt.longitude, hgt.latitude, hgt, colors='white', linewidths=1.2, levels=np.arange(5100, 6000, 60))
