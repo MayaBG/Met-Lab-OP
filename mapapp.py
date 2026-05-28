@@ -13,6 +13,35 @@ from scipy.ndimage import gaussian_filter
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
 
+# הזרקת קוד CSS להפיכת כל ממשק האפליקציה למימין לשמאל (RTL) ותיקון שילוב אנגלית
+st.markdown(
+    """
+    <style>
+    /* הפיכת כיווניות הדף הכללית והסרגלים ל-RTL */
+    .main, .sidebar .sidebar-content, [data-testid="stSidebarUserContent"] {
+        direction: RTL;
+        text-align: right;
+    }
+    /* תיקון כיווניות עבור כותרות וטקסטים */
+    h1, h2, h3, h4, h5, h6, p, span, label {
+        direction: RTL;
+        text-align: right;
+    }
+    /* התאמת תיבות הבחירה והסליידרים לימין */
+    .stSelectbox, .stSlider, .stRadio, .stButton {
+        direction: RTL;
+        text-align: right;
+    }
+    /* מניעת היפוך של טקסטים גרפיים או אלמנטים פנימיים ספציפיים במידת הצורך */
+    code, pre {
+        direction: LTR;
+        text-align: left;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("🌍 מחולל מפות סינופטיות - מעבדה")
 st.markdown("### מערכת הפקת מפות מבוססת נתוני ריאנליזה גלובלית ERA5 (ECMWF הרשמי)")
 
@@ -107,7 +136,7 @@ if st.sidebar.button("הפק מפה"):
             elif map_type == '850mb':
                 temp = ds['t'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() - 273.15
                 
-                # כעת כשהמערך מסודר, ההחלקה תתבצע בצורה חלקה ויפה
+                # החלקה גאוסאנית עדינה על שדה הטמפרטורה
                 temp_smoothed = gaussian_filter(temp.values, sigma=1.5)
                 
                 cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=1)
