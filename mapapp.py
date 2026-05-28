@@ -37,26 +37,22 @@ if st.sidebar.button("הפק מפה"):
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
             cds_key = st.secrets["CDS_KEY"]
             
-            # הגדרת החיבור הרשמי עם ביטול בדיקת SSL
-            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api", key=cds_key, verify=False)
+            # הגדרת ה-URL המדויק והעדכני של ה-API החדש (v2) כדי למנוע שגיאות 404 של המערכת הישנה
+            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api/v2", key=cds_key, verify=False)
             
             temp_filename = "era5_temp.nc"
             
-            # התאמה מלאה למבנה הפניות החדש של cds-beta
             if map_type == 'surface':
                 c.retrieve(
-                    'era5-single-levels',
+                    'reanalysis-era5-single-levels',
                     {
-                        'destinationData': {
-                            'dataset': 'reanalysis-era5-single-levels',
-                            'product_type': 'reanalysis',
-                            'format': 'netcdf',
-                            'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
-                            'year': str(year),
-                            'month': f"{month:02d}",
-                            'day': f"{day:02d}",
-                            'time': f"{hour:02d}:00",
-                        }
+                        'product_type': 'reanalysis',
+                        'format': 'netcdf',
+                        'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
+                        'year': str(year),
+                        'month': f"{month:02d}",
+                        'day': f"{day:02d}",
+                        'time': f"{hour:02d}:00",
                     },
                     temp_filename)
                 
@@ -70,19 +66,16 @@ if st.sidebar.button("הפק מפה"):
                 lev_val = '850' if map_type == '850mb' else '500'
                 
                 c.retrieve(
-                    'era5-pressure-levels',
+                    'reanalysis-era5-pressure-levels',
                     {
-                        'destinationData': {
-                            'dataset': 'reanalysis-era5-pressure-levels',
-                            'product_type': 'reanalysis',
-                            'format': 'netcdf',
-                            'variable': var_name,
-                            'pressure_level': lev_val,
-                            'year': str(year),
-                            'month': f"{month:02d}",
-                            'day': f"{day:02d}",
-                            'time': f"{hour:02d}:00",
-                        }
+                        'product_type': 'reanalysis',
+                        'format': 'netcdf',
+                        'variable': var_name,
+                        'pressure_level': lev_val,
+                        'year': str(year),
+                        'month': f"{month:02d}",
+                        'day': f"{day:02d}",
+                        'time': f"{hour:02d}:00",
                     },
                     temp_filename)
                 
