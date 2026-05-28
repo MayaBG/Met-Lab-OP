@@ -10,7 +10,7 @@ import cdsapi
 import os
 import urllib3
 
-# ביטול אזהרות SSL בדפדפן הפנימי
+# ביטול אזהרות SSL בדפדפן הפנימי של השרת
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # הגדרות עמוד של Streamlit
@@ -37,8 +37,9 @@ if st.sidebar.button("הפק מפה"):
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
             cds_key = st.secrets["CDS_KEY"]
             
-            # הגדרת ה-URL המדויק והעדכני של ה-API החדש (v2) כדי למנוע שגיאות 404 של המערכת הישנה
-            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api/v2", key=cds_key, verify=False)
+            # הכתובת הרשמית המדויקת של שרת ה-Beta החדש
+            # ספריית cdsapi מגרסה 0.7.3 ומעלה יודעת לתרגם אותה אוטומטית ללא שגיאות 404
+            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api", key=cds_key, verify=False)
             
             temp_filename = "era5_temp.nc"
             
