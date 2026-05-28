@@ -8,6 +8,10 @@ from datetime import datetime
 import matplotlib.colors as mcolors
 import cdsapi
 import os
+import urllib3
+
+# ביטול אזהרות SSL בדפדפן הפנימי
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
@@ -33,8 +37,8 @@ if st.sidebar.button("הפק מפה"):
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
             cds_key = st.secrets["CDS_KEY"]
             
-            # הגדרת החיבור הרשמי ל-API של Copernicus
-            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api", key=cds_key)
+            # הגדרת החיבור הרשמי עם ביטול בדיקת SSL קפדנית (פותר את ה-SSLError)
+            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api", key=cds_key, verify=False)
             
             # הגדרת קובץ זמני לשמירת הנתונים שיורדים מהשרת
             temp_filename = "era5_temp.nc"
@@ -55,13 +59,11 @@ if st.sidebar.button("הפק מפה"):
                     temp_filename)
                 
                 ds = xr.open_dataset(temp_filename)
-                # ERA5 נותן לחץ בפסקל, מחלקים ב-100 לקבלת hPa
                 slp = ds['msl'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) / 100.0
                 u = ds['u10'].sel(latitude=slice(40, 20), longitude=slice(20, 50))
                 v = ds['v10'].sel(latitude=slice(40, 20), longitude=slice(20, 50))
                 
             else:
-                # מפות מפלסי לחץ (רום 500 או 850)
                 var_name = 'temperature' if map_type == '850mb' else 'geopotential'
                 lev_val = '850' if map_type == '850mb' else '500'
                 
@@ -116,7 +118,6 @@ if st.sidebar.button("הפק מפה"):
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             elif map_type == '500mb':
-                # המרה של גיאופוטנציאל למטרים גיאופוטנציאליים
                 hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) / 9.80665
                 cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both')
                 plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
@@ -132,4 +133,4 @@ if st.sidebar.button("הפק מפה"):
                 os.remove(temp_filename)
             
         except Exception as e:
-            st.error(f"שגיאה במשיכת הנתונים הרשמיים משרת קופרניקוס האירופי. ודאו שהגדרתם את ה-Secrets כראוי. (Error: {e})")
+            st.error(f"שגיאה במשיכת הנתונים הרשמיים משרת קופרניקוס האירופי. (Error: {e})")
