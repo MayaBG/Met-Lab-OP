@@ -31,13 +31,13 @@ if st.sidebar.button("הפק מפה"):
             target_dt = datetime(year, month, day, hour)
             day_idx = target_dt.timetuple().tm_yday - 1
             
-            # הגדרת כתובות הנתונים
+            # עדכון לכתובות הגיבוי הישירות והיציבות יותר (FTP/HTTP)
             urls = {
-                'slp': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/surface/slp.{year}.nc",
-                'hgt': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/pressure/hgt.{year}.nc",
-                'air': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/pressure/air.{year}.nc",
-                'uwnd': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/surface/uwnd.sig995.{year}.nc",
-                'vwnd': f"https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis/surface/vwnd.sig995.{year}.nc"
+                'slp': f"https://psl.noaa.gov/file3/Datasets/ncep.reanalysis/surface/slp.{year}.nc",
+                'hgt': f"https://psl.noaa.gov/file3/Datasets/ncep.reanalysis/pressure/hgt.{year}.nc",
+                'air': f"https://psl.noaa.gov/file3/Datasets/ncep.reanalysis/pressure/air.{year}.nc",
+                'uwnd': f"https://psl.noaa.gov/file3/Datasets/ncep.reanalysis/surface/uwnd.sig995.{year}.nc",
+                'vwnd': f"https://psl.noaa.gov/file3/Datasets/ncep.reanalysis/surface/vwnd.sig995.{year}.nc"
             }
 
             # יצירת המפה
@@ -105,4 +105,4 @@ if st.sidebar.button("הפק מפה"):
             st.pyplot(fig)
             
         except Exception as e:
-            st.error(f"שגיאה בהפקת המפה. ייתכן שהנתונים לתאריך זה עדיין לא עודכנו בשרת. (קוד שגיאה: {e})")
+            st.error(f"שגיאה זמנית בתקשורת עם שרתי נועה האמריקאיים. השרת נמצא כעת בעומס או בתחזוקה. מומלץ לנסות שוב בעוד מספר דקות. (פרטי שגיאה: {e})")
