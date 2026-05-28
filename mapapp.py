@@ -13,29 +13,23 @@ from scipy.ndimage import gaussian_filter
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
 
-# הזרקת קוד CSS להפיכת כל ממשק האפליקציה למימין לשמאל (RTL) ותיקון שילוב אנגלית
+# קוד CSS עדין וממוקד: מחיל RTL רק על טקסטים וכותרות כדי למנוע את שבירת הסליידרים והגרפיקה
 st.markdown(
     """
     <style>
-    /* הפיכת כיווניות הדף הכללית והסרגלים ל-RTL */
-    .main, .sidebar .sidebar-content, [data-testid="stSidebarUserContent"] {
-        direction: RTL;
-        text-align: right;
+    /* הגדרת כיווניות ויישור לימין עבור טקסטים וכותרות בלבד */
+    h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p {
+        direction: RTL !important;
+        text-align: right !important;
     }
-    /* תיקון כיווניות עבור כותרות וטקסטים */
-    h1, h2, h3, h4, h5, h6, p, span, label {
-        direction: RTL;
-        text-align: right;
-    }
-    /* התאמת תיבות הבחירה והסליידרים לימין */
-    .stSelectbox, .stSlider, .stRadio, .stButton {
-        direction: RTL;
-        text-align: right;
-    }
-    /* מניעת היפוך של טקסטים גרפיים או אלמנטים פנימיים ספציפיים במידת הצורך */
-    code, pre {
+    /* השארת רכיבי הסליידרים והכפתורים עצמם במבנה הסטנדרטי שלהם כדי שלא יישברו */
+    div[data-testid="stSlider"], div[data-testid="stRadio"] {
         direction: LTR;
-        text-align: left;
+    }
+    /* תיקון ספציפי לתוויות של כפתורי הרדיו שיוצגו נכון לצד הכפתור */
+    div[data-testid="stRadio"] label {
+        direction: RTL !important;
+        text-align: right !important;
     }
     </style>
     """,
