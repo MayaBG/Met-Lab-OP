@@ -6,46 +6,82 @@ import xarray as xr
 import numpy as np
 from datetime import datetime
 import matplotlib.colors as mcolors
+import cdsapi
+import os
 
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
 
 st.title("🌍 מחולל מפות סינופטיות - מעבדה")
-st.markdown("### מערכת הפקת מפות מבוססת נתוני ריאנליזה גלובלית MERRA-2 (NASA)")
+st.markdown("### מערכת הפקת מפות מבוססת נתוני ריאנליזה גלובלית ERA5 (ECMWF הרשמי)")
 
 # סרגל צד להגדרות המשתמש
 st.sidebar.header("הגדרות הפקה")
 
-year = st.sidebar.slider("שנה", 1980, 2026, 2026)
+year = st.sidebar.slider("שנה", 1979, 2026, 2026)
 month = st.sidebar.slider("חודש", 1, 12, 4)
 day = st.sidebar.slider("יום", 1, 31, 27)
-
-# בחירת שעה מתוך רשימה קבועה
 hour = st.sidebar.selectbox("שעה (UTC)", [0, 6, 12, 18], index=2)
 
 map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb"])
 
 if st.sidebar.button("הפק מפה"):
-    with st.spinner('מושך נתוני ריאנליזה משרתי NASA...'):
+    with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5 מאומתים...'):
         try:
             target_dt = datetime(year, month, day, hour)
-            date_str = target_dt.strftime("%Y%m%d")
             
-            # הגדרת שרתי הנתונים הפתוחים של נאס"א (MERRA-2)
-            # מאגר זה רציף לחלוטין ופתוח ללא הגבלות
+            # משיכת המפתח המאובטח מהכספת של סטריםלייט
+            cds_key = st.secrets["CDS_KEY"]
+            
+            # הגדרת החיבור הרשמי ל-API של Copernicus
+            c = cdsapi.Client(url="https://cds-beta.climate.copernicus.eu/api", key=cds_key)
+            
+            # הגדרת קובץ זמני לשמירת הנתונים שיורדים מהשרת
+            temp_filename = "era5_temp.nc"
+            
+            # הגדרת הפרמטרים לבקשת הנתונים לפי סוג המפה
             if map_type == 'surface':
-                # קובץ נתוני קרקע (לחץ ורוחות)
-                url = f"https://goldsmr4.gesdisc.eosdis.nasa.gov/opendap/MERRA2/M2I3NVASM.5.12.4/{year}/{month:02d}/MERRA2_400.inst3_3d_asm_Np.{date_str}.nc4"
+                c.retrieve(
+                    'reanalysis-era5-single-levels',
+                    {
+                        'product_type': 'reanalysis',
+                        'format': 'netcdf',
+                        'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
+                        'year': str(year),
+                        'month': f"{month:02d}",
+                        'day': f"{day:02d}",
+                        'time': f"{hour:02d}:00",
+                    },
+                    temp_filename)
+                
+                ds = xr.open_dataset(temp_filename)
+                # ERA5 נותן לחץ בפסקל, מחלקים ב-100 לקבלת hPa
+                slp = ds['msl'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) / 100.0
+                u = ds['u10'].sel(latitude=slice(40, 20), longitude=slice(20, 50))
+                v = ds['v10'].sel(latitude=slice(40, 20), longitude=slice(20, 50))
+                
             else:
-                # קובץ מפלסי לחץ (רום 500 ו-850)
-                url = f"https://goldsmr4.gesdisc.eosdis.nasa.gov/opendap/MERRA2/M2I3NPASM.5.12.4/{year}/{month:02d}/MERRA2_400.inst3_3d_asm_Np.{date_str}.nc4"
-            
-            ds = xr.open_dataset(url)
-            
-            # חילוץ אינדקס השעה המדויק (MERRA-2 שומר 8 קריאות ביום, כל 3 שעות)
-            time_idx = hour // 3
+                # מפות מפלסי לחץ (רום 500 או 850)
+                var_name = 'temperature' if map_type == '850mb' else 'geopotential'
+                lev_val = '850' if map_type == '850mb' else '500'
+                
+                c.retrieve(
+                    'reanalysis-era5-pressure-levels',
+                    {
+                        'product_type': 'reanalysis',
+                        'format': 'netcdf',
+                        'variable': var_name,
+                        'pressure_level': lev_val,
+                        'year': str(year),
+                        'month': f"{month:02d}",
+                        'day': f"{day:02d}",
+                        'time': f"{hour:02d}:00",
+                    },
+                    temp_filename)
+                
+                ds = xr.open_dataset(temp_filename)
 
-            # בניית מפה ועיבוד נתונים
+            # בניית המפה הגרפית
             fig = plt.figure(figsize=(14, 10))
             ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
             ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
@@ -61,42 +97,39 @@ if st.sidebar.button("הפק מפה"):
                 '500mb': "500hPa Geopotential Height (m)",
                 '850mb': "850hPa Temperature (°C)"
             }
-            title_text = f"{map_info[map_type]}\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: NASA MERRA-2 Reanalysis"
+            title_text = f"{map_info[map_type]}\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
 
             if map_type == 'surface':
-                # SLP ב-MERRA-2 מגיע בפסקל, מחלקים ב-100 לקבלת hPa
-                slp = ds['SLP'].isel(time=time_idx).sel(lat=slice(20, 40), lon=slice(20, 50)) / 100.0
-                
                 white_cmap = mcolors.ListedColormap(['white'])
-                cf = ax.contourf(slp.lon, slp.lat, slp, cmap=white_cmap, levels=[slp.min(), slp.max()])
+                cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()])
                 plt.colorbar(cf, orientation='horizontal', pad=0.08, aspect=40).ax.set_visible(False)
                 
-                cntr = ax.contour(slp.lon, slp.lat, slp, colors='black', levels=np.arange(980, 1040, 2))
+                cntr = ax.contour(slp.longitude, slp.latitude, slp, colors='black', levels=np.arange(980, 1040, 2))
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
-                
-                # רוחות קרקע (רכיבי U ו-V בגובה 10 מטרים)
-                u = ds['U10M'].isel(time=time_idx).sel(lat=slice(20, 40), lon=slice(20, 50))
-                v = ds['V10M'].isel(time=time_idx).sel(lat=slice(20, 40), lon=slice(20, 50))
-                ax.barbs(u.lon[::2], u.lat[::2], u.values[::2, ::2], v.values[::2, ::2], length=6, color='darkblue')
+                ax.barbs(u.longitude[::2], u.latitude[::2], u.values[::2, ::2], v.values[::2, ::2], length=6, color='darkblue')
 
             elif map_type == '850mb':
-                # טמפרטורה מגיעה בקלווין, ממירי הצלזיוס. מפלס 850hPa
-                temp = ds['T'].isel(time=time_idx).sel(lev=850, lat=slice(20, 40), lon=slice(20, 50)) - 273.15
-                cf = ax.contourf(temp.lon, temp.lat, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both')
+                temp = ds['t'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) - 273.15
+                cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both')
                 plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
-                cntr = ax.contour(temp.lon, temp.lat, temp, colors='black', levels=np.arange(-15, 35, 2), linewidths=0.8)
+                cntr = ax.contour(temp.longitude, temp.latitude, temp, colors='black', levels=np.arange(-15, 35, 2), linewidths=0.8)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             elif map_type == '500mb':
-                # גובה גיאופוטנציאלי במפלס 500hPa. MERRA-2 נותן H המרה למטרים
-                hgt = ds['H'].isel(time=time_idx).sel(lev=500, lat=slice(20, 40), lon=slice(20, 50))
-                cf = ax.contourf(hgt.lon, hgt.lat, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both')
+                # המרה של גיאופוטנציאל למטרים גיאופוטנציאליים
+                hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)) / 9.80665
+                cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both')
                 plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
-                cntr = ax.contour(hgt.lon, hgt.lat, hgt, colors='white', linewidths=1.2, levels=np.arange(5100, 6000, 60))
+                cntr = ax.contour(hgt.longitude, hgt.latitude, hgt, colors='white', linewidths=1.2, levels=np.arange(5100, 6000, 60))
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             plt.title(title_text, fontsize=14, pad=20)
             st.pyplot(fig)
             
+            # ניקוי הקובץ הזמני בסיום
+            ds.close()
+            if os.path.exists(temp_filename):
+                os.remove(temp_filename)
+            
         except Exception as e:
-            st.error(f"שגיאה זמנית בתקשורת עם שרתי NASA או שהנתונים ליום זה טרם שוחררו. אנא ודאו שהתאריך תקין. (Error: {e})")
+            st.error(f"שגיאה במשיכת הנתונים הרשמיים משרת קופרניקוס האירופי. ודאו שהגדרתם את ה-Secrets כראוי. (Error: {e})")
