@@ -51,13 +51,14 @@ if st.sidebar.button("הפק מפה"):
                     },
                     temp_filename)
                 
-                ds = xr.open_dataset(temp_filename)
-                slp = ds['msl'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 100.0
-                u = ds['u10'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze()
-                v = ds['v10'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze()
+                # טעינה וסידור קווי הרוחב בסדר עולה כדי שההחלקה הגרפית תעבוד כמו שצריך
+                ds = xr.open_dataset(temp_filename).sortby('latitude')
+                slp = ds['msl'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 100.0
+                u = ds['u10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
+                v = ds['v10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
                 
                 # החלקת השדה הסינופטי של הלחץ בקרקע לזרימה נקייה
-                slp_smoothed = gaussian_filter(slp.values, sigma=1.0)
+                slp_smoothed = gaussian_filter(slp.values, sigma=1.2)
                 
             else:
                 var_name = 'temperature' if map_type == '850mb' else 'geopotential'
@@ -77,20 +78,13 @@ if st.sidebar.button("הפק מפה"):
                     },
                     temp_filename)
                 
-                ds = xr.open_dataset(temp_filename)
+                # טעינה וסידור קווי הרוחב בסדר עולה למפות הרום
+                ds = xr.open_dataset(temp_filename).sortby('latitude')
 
             # בניית המפה הגרפית
             fig = plt.figure(figsize=(14, 10))
             ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
             ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
-            
-            # קווי חוף וגבולות בצבע אפור עמום לשמירה על רקע נקי
-            ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.2, edgecolor='#7f8c8d', zorder=1)
-            ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor='#95a5a6', zorder=1)
-            
-            gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5, color='#bdc3c7')
-            gl.top_labels = False
-            gl.right_labels = False
 
             map_info = {
                 'surface': "Surface MSLP (hPa) & Wind Barbs",
@@ -99,41 +93,47 @@ if st.sidebar.button("הפק מפה"):
             }
             title_text = f"{map_info[map_type]}\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
 
+            # --- שלב הציור המטאורולוגי (מתחת לקווי המפה) ---
             if map_type == 'surface':
                 white_cmap = mcolors.ListedColormap(['white'])
-                cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=2)
+                cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=1)
                 
-                # תיקון: הסרת הפרמטר weight שגרם לקריסה
-                cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=3)
+                cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=2)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
                 
-                # דילול דגלי הרוח (כל 5 נקודות) למניעת צפיפות
                 ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], 
-                         length=5.5, color='#1b3a4b', linewidth=0.9, zorder=4)
+                         length=5.5, color='#1b3a4b', linewidth=0.9, zorder=3)
 
             elif map_type == '850mb':
-                temp = ds['t'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() - 273.15
+                temp = ds['t'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() - 273.15
                 
-                # החלקה גאוסאנית עדינה על שדה הטמפרטורה
-                temp_smoothed = gaussian_filter(temp.values, sigma=1.2)
+                # כעת כשהמערך מסודר, ההחלקה תתבצע בצורה חלקה ויפה
+                temp_smoothed = gaussian_filter(temp.values, sigma=1.5)
                 
-                cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=2)
+                cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=1)
                 plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
                 
-                cntr = ax.contour(temp.longitude, temp.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.0, zorder=3)
+                cntr = ax.contour(temp.longitude, temp.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.2, zorder=2)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             elif map_type == '500mb':
-                hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 9.80665
+                hgt = ds['z'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 9.80665
                 
-                # החלקת הגובה הגיאופוטנציאלי ברום לזרימה נקייה
-                hgt_smoothed = gaussian_filter(hgt.values, sigma=1.0)
+                hgt_smoothed = gaussian_filter(hgt.values, sigma=1.2)
                 
-                cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=2)
+                cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=1)
                 plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
                 
-                cntr = ax.contour(hgt.longitude, hgt.latitude, hgt_smoothed, colors='white', linewidths=1.5, levels=np.arange(5100, 6000, 60), zorder=3)
+                cntr = ax.contour(hgt.longitude, hgt.latitude, hgt_smoothed, colors='white', linewidths=1.6, levels=np.arange(5100, 6000, 60), zorder=2)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
+
+            # --- שלב הציור הגאוגרפי (מוקפץ לשכבה העליונה zorder=4) ---
+            ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.2, edgecolor='black', zorder=4)
+            ax.add_feature(cfeature.BORDERS, linestyle=':', linewidth=1.0, edgecolor='#2c3e50', zorder=4)
+            
+            gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5, color='#bdc3c7', zorder=3)
+            gl.top_labels = False
+            gl.right_labels = False
 
             plt.title(title_text, fontsize=14, pad=20, weight='bold')
             st.pyplot(fig)
