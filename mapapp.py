@@ -8,6 +8,7 @@ from datetime import datetime
 import matplotlib.colors as mcolors
 import cdsapi
 import os
+from scipy.ndimage import gaussian_filter
 
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
@@ -32,8 +33,6 @@ if st.sidebar.button("הפק מפה"):
             
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
             cds_key = st.secrets["CDS_KEY"]
-            
-            # שימוש בכתובת המדויקת שמופיעה אצלך במסך של קופרניקוס!
             c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=cds_key)
             
             temp_filename = "era5_temp.nc"
@@ -53,10 +52,12 @@ if st.sidebar.button("הפק מפה"):
                     temp_filename)
                 
                 ds = xr.open_dataset(temp_filename)
-                # הוספת squeeze() להפיכת המערך לדו-מימדי (2D) כפי שנדרש בציור
                 slp = ds['msl'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 100.0
                 u = ds['u10'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze()
                 v = ds['v10'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze()
+                
+                # החלקת השדה הסינופטי של הלחץ בקרקע לזרימה נקייה
+                slp_smoothed = gaussian_filter(slp.values, sigma=1.0)
                 
             else:
                 var_name = 'temperature' if map_type == '850mb' else 'geopotential'
@@ -83,9 +84,11 @@ if st.sidebar.button("הפק מפה"):
             ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
             ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
             
-            ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.5)
-            ax.add_feature(cfeature.BORDERS, linestyle=':')
-            gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.6)
+            # קווי חוף וגבולות בצבע אפור עמום לשמירה על רקע נקי
+            ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.2, edgecolor='#7f8c8d', zorder=1)
+            ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor='#95a5a6', zorder=1)
+            
+            gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5, color='#bdc3c7')
             gl.top_labels = False
             gl.right_labels = False
 
@@ -98,30 +101,40 @@ if st.sidebar.button("הפק מפה"):
 
             if map_type == 'surface':
                 white_cmap = mcolors.ListedColormap(['white'])
-                cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()])
-                plt.colorbar(cf, orientation='horizontal', pad=0.08, aspect=40).ax.set_visible(False)
+                cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=2)
                 
-                cntr = ax.contour(slp.longitude, slp.latitude, slp, colors='black', levels=np.arange(980, 1040, 2))
-                ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
-                ax.barbs(u.longitude[::2], u.latitude[::2], u.values[::2, ::2], v.values[::2, ::2], length=6, color='darkblue')
+                cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=3)
+                ax.clabel(cntr, inline=True, fmt='%i', fontsize=11, weight='bold')
+                
+                ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], 
+                         length=5.5, color='#1b3a4b', linewidth=0.9, zorder=4)
 
             elif map_type == '850mb':
-                # הוספת squeeze() למפות הרום
                 temp = ds['t'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() - 273.15
-                cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both')
+                
+                # החלקה גאוסאנית עדינה על שדה הטמפרטורה (sigma=1.2 נותן קווים עגולים וחלקים)
+                temp_smoothed = gaussian_filter(temp.values, sigma=1.2)
+                
+                cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=2)
                 plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
-                cntr = ax.contour(temp.longitude, temp.latitude, temp, colors='black', levels=np.arange(-15, 35, 2), linewidths=0.8)
+                
+                # ציור קווי המתאר המוחלקים
+                cntr = ax.contour(temp.longitude, temp.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.0, zorder=3)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
             elif map_type == '500mb':
-                # הוספת squeeze() למפות הרום
                 hgt = ds['z'].sel(latitude=slice(40, 20), longitude=slice(20, 50)).squeeze() / 9.80665
-                cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both')
+                
+                # החלקת הגובה הגיאופוטנציאלי ברום לזרימה נקייה ומקצועית
+                hgt_smoothed = gaussian_filter(hgt.values, sigma=1.0)
+                
+                cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=2)
                 plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
-                cntr = ax.contour(hgt.longitude, hgt.latitude, hgt, colors='white', linewidths=1.2, levels=np.arange(5100, 6000, 60))
+                
+                cntr = ax.contour(hgt.longitude, hgt.latitude, hgt_smoothed, colors='white', linewidths=1.5, levels=np.arange(5100, 6000, 60), zorder=3)
                 ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
 
-            plt.title(title_text, fontsize=14, pad=20)
+            plt.title(title_text, fontsize=14, pad=20, weight='bold')
             st.pyplot(fig)
             
             ds.close()
