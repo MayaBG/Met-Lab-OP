@@ -50,9 +50,13 @@ hour = st.sidebar.selectbox("שעה (UTC)", [0, 6, 12, 18], index=2)
 map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb"])
 
 if st.sidebar.button("הפק מפה"):
-    with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5...'):
-        try:
-            target_dt = datetime(year, month, day, hour)
+    #בדיקה חכמה: האם המפתח בכלל קיים בכספת של השרת?
+    if "CDS_KEY" dashed not in st.secrets:
+        st.error("🔑 מפתח ה-API (CDS_KEY)אינו מוגדר בהגדרות האפליקציה. אנא הזיני את המפתח כדי לאפשר הפקת מפות.")
+    else:
+        with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5...'):
+            try:
+                target_dt = datetime(year, month, day, hour)
             
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
             cds_key = st.secrets["CDS_KEY"]
