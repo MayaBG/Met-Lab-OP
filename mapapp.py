@@ -51,7 +51,7 @@ map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb"])
 
 if st.sidebar.button("הפק מפה"):
         
-if "CDS_KEY" not in st.secrets:
+ if "CDS_KEY" not in st.secrets:
             st.error("🔑 מפתח ה-API (CDS_KEY) אינו מוגדר בהגדרות האפליקציה (Secrets). אנא הזיני את המפתח כדי לאפשר הפקת מפות.")
         else:
             with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5...'):
