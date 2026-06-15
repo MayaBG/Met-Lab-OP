@@ -49,34 +49,34 @@ hour = st.sidebar.selectbox("שעה (UTC)", [0, 6, 12, 18], index=2)
 
 map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb"])
 
-if st.sidebar.button("הפק מפה"):
-    #בדיקה חכמה: האם המפתח בכלל קיים בכספת של השרת?
-    if "CDS_KEY" not in st.secrets:
-        st.error("🔑 מפתח ה-API (CDS_KEY)אינו מוגדר בהגדרות האפליקציה. אנא הזיני את המפתח כדי לאפשר הפקת מפות.")
-    else:
-        with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5...'):
-            try:
-                target_dt = datetime(year, month, day, hour)
-            
-            # משיכת המפתח המאובטח מהכספת של סטריםלייט
-                 cds_key = st.secrets["CDS_KEY"]
-                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=cds_key)
-            
-                 temp_filename = "era5_temp.nc"
-            
-                 if map_type == 'surface':
-                    c.retrieve(
-                        'reanalysis-era5-single-levels',
-                       {
-                           'product_type': 'reanalysis',
-                           'format': 'netcdf',
-                           'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
-                           'year': str(year),
-                           'month': f"{month:02d}",
-                           'day': f"{day:02d}",
-                           'time': f"{hour:02d}:00",
-                        },
-                        temp_filename)
+    if st.sidebar.button("הפק מפה"):
+        if "CDS_KEY" not in st.secrets:
+            st.error("🔑 מפתח ה-API (CDS_KEY) אינו מוגדר בהגדרות האפליקציה (Secrets). אנא הזיני את המפתח כדי לאפשר הפקת מפות.")
+        else:
+            with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5...'):
+                try:
+                    target_dt = datetime(year, month, day, hour)
+                    
+                    cds_key = st.secrets["CDS_KEY"]
+                    c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=cds_key)
+                    
+                    temp_filename = "era5_temp.nc"
+                    
+                    if map_type == 'surface':
+                        c.retrieve(
+                            'reanalysis-era5-single-levels',
+                            {
+                                'product_type': 'reanalysis',
+                                'format': 'netcdf',
+                                'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
+                                'year': str(year),
+                                'month': f"{month:02d}",
+                                'day': f"{day:02d}",
+                                'time': f"{hour:02d}:00",
+                            },
+                            temp_filename
+                        )
+
                 
                    # טעינה וסידור קווי הרוחב בסדר עולה כדי שההחלקה הגרפית תעבוד כמו שצריך
                    ds = xr.open_dataset(temp_filename).sortby('latitude')
