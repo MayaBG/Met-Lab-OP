@@ -59,33 +59,33 @@ if st.sidebar.button("הפק מפה"):
                 target_dt = datetime(year, month, day, hour)
             
             # משיכת המפתח המאובטח מהכספת של סטריםלייט
-            cds_key = st.secrets["CDS_KEY"]
-            c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=cds_key)
+                 cds_key = st.secrets["CDS_KEY"]
+                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=cds_key)
             
-            temp_filename = "era5_temp.nc"
+                 temp_filename = "era5_temp.nc"
             
-            if map_type == 'surface':
-                c.retrieve(
-                    'reanalysis-era5-single-levels',
-                    {
-                        'product_type': 'reanalysis',
-                        'format': 'netcdf',
-                        'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
-                        'year': str(year),
-                        'month': f"{month:02d}",
-                        'day': f"{day:02d}",
-                        'time': f"{hour:02d}:00",
-                    },
-                    temp_filename)
+                 if map_type == 'surface':
+                    c.retrieve(
+                        'reanalysis-era5-single-levels',
+                       {
+                           'product_type': 'reanalysis',
+                           'format': 'netcdf',
+                           'variable': ['mean_sea_level_pressure', '10m_u_component_of_wind', '10m_v_component_of_wind'],
+                           'year': str(year),
+                           'month': f"{month:02d}",
+                           'day': f"{day:02d}",
+                           'time': f"{hour:02d}:00",
+                        },
+                        temp_filename)
                 
-                # טעינה וסידור קווי הרוחב בסדר עולה כדי שההחלקה הגרפית תעבוד כמו שצריך
-                ds = xr.open_dataset(temp_filename).sortby('latitude')
-                slp = ds['msl'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 100.0
-                u = ds['u10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
-                v = ds['v10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
+                   # טעינה וסידור קווי הרוחב בסדר עולה כדי שההחלקה הגרפית תעבוד כמו שצריך
+                   ds = xr.open_dataset(temp_filename).sortby('latitude')
+                   slp = ds['msl'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 100.0
+                   u = ds['u10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
+                   v = ds['v10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
                 
-                # החלקת השדה הסינופטי של הלחץ בקרקע לזרימה נקייה
-                slp_smoothed = gaussian_filter(slp.values, sigma=1.2)
+                   # החלקת השדה הסינופטי של הלחץ בקרקע לזרימה נקייה
+                   slp_smoothed = gaussian_filter(slp.values, sigma=1.2)
                 
             else:
                 var_name = 'temperature' if map_type == '850mb' else 'geopotential'
