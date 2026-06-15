@@ -159,6 +159,7 @@ if st.sidebar.button("הפק מפה"):
             gl.right_labels = False
 
             plt.title(title_text, fontsize=14, pad=20, weight='bold')
+            fig.tight_layout()
             st.pyplot(fig)
             
             ds.close()
