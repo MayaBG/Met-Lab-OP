@@ -47,7 +47,9 @@ month = st.sidebar.slider("חודש", 1, 12, 4)
 day = st.sidebar.slider("יום", 1, 31, 27)
 hour = st.sidebar.selectbox("שעה (UTC)", [0, 6, 12, 18], index=2)
 
-map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb" if st.sidebar.button("הפק מפה"):
+map_type = st.sidebar.radio("סוג מפה", ["surface", "500mb", "850mb"])
+
+if st.sidebar.button("הפק מפה"):
         
 if "CDS_KEY" not in st.secrets:
             st.error("🔑 מפתח ה-API (CDS_KEY) אינו מוגדר בהגדרות האפליקציה (Secrets). אנא הזיני את המפתח כדי לאפשר הפקת מפות.")
