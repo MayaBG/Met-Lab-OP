@@ -13,20 +13,17 @@ from scipy.ndimage import gaussian_filter
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
 
-# קוד CSS עדין וממוקד: מחיל RTL רק על טקסטים וכותרות כדי למנוע את שבירת הסליידרים והגרפיקה
+# קוד CSS עדין וממוקד: מחיל RTL רק על טקסטים וכותרות למניעת שבירת ממשק
 st.markdown(
     """
     <style>
-    /* הגדרת כיווניות ויישור לימין עבור טקסטים וכותרות בלבד */
     h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown, [data-testid="stWidgetLabel"] p {
         direction: RTL !important;
         text-align: right !important;
     }
-    /* השארת רכיבי הסליידרים והכפתורים עצמם במבנה הסטנדרטי שלהם כדי שלא יישברו */
     div[data-testid="stSlider"], div[data-testid="stRadio"] {
         direction: LTR;
     }
-    /* תיקון ספציפי לתוויות של כפתורי הרדיו שיוצגו נכון לצד הכפתור */
     div[data-testid="stRadio"] label {
         direction: RTL !important;
         text-align: right !important;
@@ -56,13 +53,12 @@ if st.sidebar.button("הפק מפה"):
         with st.spinner('מתחבר לשרת האירופי ומושך נתוני ERA5...'):
             try:
                 target_dt = datetime(year, month, day, hour)
-                
-                # משיכת המפתח המאובטח מהכספת של סטריםלייט
                 cds_key = st.secrets["CDS_KEY"]
                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=cds_key)
                 
-                temp_filename = "era5_temp.nc"
+                temp_filename = f"era5_{map_type}_temp.nc"
                 
+                # --- בניית מפת קרקע (Surface) ---
                 if map_type == 'surface':
                     c.retrieve(
                         'reanalysis-era5-single-levels',
@@ -77,26 +73,34 @@ if st.sidebar.button("הפק מפה"):
                         },
                         temp_filename)
                     
-                    # טעינה וסידור קווי הרוחב בסדר עולה
                     ds = xr.open_dataset(temp_filename).sortby('latitude')
                     slp = ds['msl'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 100.0
                     u = ds['u10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
                     v = ds['v10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
-                    
-                    # החלקת השדה הסינופטי של הלחץ בקרקע לזרימה נקייה
                     slp_smoothed = gaussian_filter(slp.values, sigma=1.2)
                     
-                else:
-                    var_name = 'temperature' if map_type == '850mb' else 'geopotential'
-                    lev_val = '850' if map_type == '850mb' else '500'
+                    fig = plt.figure(figsize=(14, 11))
+                    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+                    ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
+                    white_cmap = mcolors.ListedColormap(['white'])
+                    ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=1)
+                    cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=2)
+                    ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
+                    ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=5.5, color='#1b3a4b', linewidth=0.9, zorder=3)
+                    
+                    title_text = f"Surface MSLP (hPa) & Wind Barbs\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
+                    plt.title(title_text, fontsize=13, pad=18, weight='bold')
+
+                # --- בניית מפת 850mb ---
+                elif map_type == '850mb':
                     c.retrieve(
                         'reanalysis-era5-pressure-levels',
                         {
                             'product_type': 'reanalysis',
                             'format': 'netcdf',
-                            'variable': var_name,
-                            'pressure_level': lev_val,
+                            'variable': 'temperature',
+                            'pressure_level': '850',
                             'year': str(year),
                             'month': f"{month:02d}",
                             'day': f"{day:02d}",
@@ -104,53 +108,55 @@ if st.sidebar.button("הפק מפה"):
                         },
                         temp_filename)
                     
-                    # טעינה וסידור קווי הרוחב בסדר עולה למפות הרום
                     ds = xr.open_dataset(temp_filename).sortby('latitude')
-
-                # בניית המפה הגרפית - מיושר כחלק מה-try הכללי
-                fig = plt.figure(figsize=(14, 10))
-                ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-                ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
-
-                map_info = {
-                    'surface': "Surface MSLP (hPa) & Wind Barbs",
-                    '500mb': "500hPa Geopotential Height (m)",
-                    '850mb': "850hPa Temperature (°C)"
-                }
-                title_text = f"{map_info[map_type]} | Valid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
-
-                # --- שלב הציור המטאורולוגי (מתחת לקווי המפה) ---
-                if map_type == 'surface':
-                    white_cmap = mcolors.ListedColormap(['white'])
-                    cf = ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=1)
+                    temp_data = ds['t'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() - 273.15
+                    temp_smoothed = gaussian_filter(temp_data.values, sigma=1.5)
                     
-                    cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=2)
-                    ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
+                    fig = plt.figure(figsize=(14, 11))
+                    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+                    ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], 
-                             length=5.5, color='#1b3a4b', linewidth=0.9, zorder=3)
-
-                elif map_type == '850mb':
-                    temp = ds['t'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() - 273.15
-                    temp_smoothed = gaussian_filter(temp.values, sigma=1.5)
-                    
-                    cf = ax.contourf(temp.longitude, temp.latitude, temp, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=1)
+                    cf = ax.contourf(temp_data.longitude, temp_data.latitude, temp_data, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=1)
                     plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
-                    
-                    cntr = ax.contour(temp.longitude, temp.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.2, zorder=2)
+                    cntr = ax.contour(temp_data.longitude, temp_data.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.2, zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
+                    
+                    title_text = f"850hPa Temperature (°C)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
+                    plt.title(title_text, fontsize=13, pad=18, weight='bold')
 
+                # --- בניית מפת 500mb ---
                 elif map_type == '500mb':
+                    c.retrieve(
+                        'reanalysis-era5-pressure-levels',
+                        {
+                            'product_type': 'reanalysis',
+                            'format': 'netcdf',
+                            'variable': 'geopotential',
+                            'pressure_level': '500',
+                            'year': str(year),
+                            'month': f"{month:02d}",
+                            'day': f"{day:02d}",
+                            'time': f"{hour:02d}:00",
+                        },
+                        temp_filename)
+                    
+                    ds = xr.open_dataset(temp_filename).sortby('latitude')
                     hgt = ds['z'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 9.80665
                     hgt_smoothed = gaussian_filter(hgt.values, sigma=1.2)
                     
+                    fig = plt.figure(figsize=(14, 11))
+                    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+                    ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
+                    
                     cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=1)
                     plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
-                    
                     cntr = ax.contour(hgt.longitude, hgt.latitude, hgt_smoothed, colors='white', linewidths=1.6, levels=np.arange(5100, 6000, 60), zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
+                    
+                    title_text = f"500hPa Geopotential Height (m)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
+                    plt.title(title_text, fontsize=13, pad=18, weight='bold')
 
-                # --- שלב הציור הגאוגרפי (מוקפץ לשכבה העליונה zorder=4) ---
+                # --- שכבה גאוגרפית משותפת (מתבצעת בסוף הבלוק בצורה נקייה) ---
                 ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.2, edgecolor='black', zorder=4)
                 ax.add_feature(cfeature.BORDERS, linestyle=':', linewidth=1.0, edgecolor='#2c3e50', zorder=4)
                 
@@ -158,9 +164,8 @@ if st.sidebar.button("הפק מפה"):
                 gl.top_labels = False
                 gl.right_labels = False
 
-                # הדפסת כותרת קריאה ויציבה מעל הגרף ב-Streamlit
-                st.markdown(f"### {title_text}")
-                fig.tight_layout()
+                # הפיכת השוליים העליונים לקשיחים כדי שהכותרת לא תיחתך לעולם
+                fig.subplots_adjust(top=0.88, bottom=0.15)
                 st.pyplot(fig)
                 
                 ds.close()
@@ -168,4 +173,4 @@ if st.sidebar.button("הפק מפה"):
                     os.remove(temp_filename)
                 
             except Exception as e:
-                st.error(f"שגיאה במשיכת הנתונים הרשמיים משרת קופרניקוס האירופי. (Error: {e})")
+                st.error(f"שגיאה בהפקת המפה או במשיכת הנתונים: {e}")
