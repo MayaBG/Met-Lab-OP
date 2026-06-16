@@ -83,8 +83,9 @@ if st.sidebar.button("הפק מפה"):
                     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
                     ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    white_cmap = mcolors.ListedColormap(['white'])
-                    ax.contourf(slp.longitude, slp.latitude, slp, cmap=white_cmap, levels=[slp.min(), slp.max()], zorder=1)
+                    # הגדרת רקע לבן יציב ומניעת קריסת גודל המפה
+                    ax.set_facecolor('white')
+                    
                     cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
                     ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=5.5, color='#1b3a4b', linewidth=0.9, zorder=3)
@@ -161,7 +162,7 @@ if st.sidebar.button("הפק מפה"):
                 gl.top_labels = False
                 gl.right_labels = False
 
-                # כתיבת כותרת קשיחה בתוך התמונה משמאל למניעת היעלמות בגלל RTL דפדפני
+                # מיקום כותרת-על משמאל באופן קשיח (חסין RTL)
                 fig.suptitle(title_text, fontsize=14, weight='bold', x=0.12, y=0.96, ha='left')
                 fig.subplots_adjust(top=0.88, bottom=0.15)
                 
