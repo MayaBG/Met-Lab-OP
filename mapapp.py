@@ -83,12 +83,15 @@ if st.sidebar.button("הפק מפה"):
                     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
                     ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    # הגדרת רקע לבן יציב ומניעת קריסת גודל המפה
+                    # רקע לבן נקי לחלוטין למפה
                     ax.set_facecolor('white')
                     
-                    cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.8, zorder=2)
+                    # קווי לחץ שחורים וברורים
+                    cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.6, zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
-                    ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=5.5, color='#1b3a4b', linewidth=0.9, zorder=3)
+                    
+                    # דגלוני רוח שחורים, מודגשים ובולטים מעל הרקע הלבן
+                    ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=6.0, color='black', linewidth=1.1, zorder=3)
                     
                     title_text = f"Surface MSLP (hPa) & 10m Wind Barbs\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
@@ -155,16 +158,16 @@ if st.sidebar.button("הפק מפה"):
                     title_text = f"500hPa Geopotential Height (m)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
                 # --- שכבה גאוגרפית משותפת לכל המפלסים ---
-                ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.2, edgecolor='black', zorder=4)
-                ax.add_feature(cfeature.BORDERS, linestyle=':', linewidth=1.0, edgecolor='#2c3e50', zorder=4)
+                ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.3, edgecolor='black', zorder=4)
+                ax.add_feature(cfeature.BORDERS, linestyle=':', linewidth=1.0, edgecolor='#444444', zorder=4)
                 
-                gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.5, color='#bdc3c7', zorder=3)
+                gl = ax.gridlines(draw_labels=True, linestyle='--', alpha=0.4, color='#bdc3c7', zorder=3)
                 gl.top_labels = False
                 gl.right_labels = False
 
-                # מיקום כותרת-על משמאל באופן קשיח (חסין RTL)
-                fig.suptitle(title_text, fontsize=14, weight='bold', x=0.12, y=0.96, ha='left')
-                fig.subplots_adjust(top=0.88, bottom=0.15)
+                # קיבוע ידני של מיקום המפה והשוליים - מונע קריסה בשחור-לבן
+                fig.subplots_adjust(top=0.88, bottom=0.15, left=0.05, right=0.95)
+                fig.suptitle(title_text, fontsize=14, weight='bold', x=0.06, y=0.96, ha='left')
                 
                 st.pyplot(fig)
                 
