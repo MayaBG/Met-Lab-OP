@@ -74,6 +74,7 @@ if st.sidebar.button("הפק מפה"):
                         temp_filename)
                     
                     ds = xr.open_dataset(temp_filename).sortby('latitude')
+                    
                     slp = ds['msl'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 100.0
                     u = ds['u10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
                     v = ds['v10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
@@ -83,14 +84,14 @@ if st.sidebar.button("הפק מפה"):
                     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
                     ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    # רקע לבן נקי לחלוטין למפה
-                    ax.set_facecolor('white')
+                    # הטריק שמונע את קריסת המפה: שכבת צבע מלאה, אבל שקופה/לבנה לחלוטין
+                    ax.contourf(slp.longitude, slp.latitude, slp_smoothed, colors=['white'], levels=np.arange(960, 1060, 2), extend='both', zorder=1)
                     
                     # קווי לחץ שחורים וברורים
                     cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.6, zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
                     
-                    # דגלוני רוח שחורים, מודגשים ובולטים מעל הרקע הלבן
+                    # דגלוני רוח שחורים ומודגשים
                     ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=6.0, color='black', linewidth=1.1, zorder=3)
                     
                     title_text = f"Surface MSLP (hPa) & 10m Wind Barbs\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
@@ -165,7 +166,7 @@ if st.sidebar.button("הפק מפה"):
                 gl.top_labels = False
                 gl.right_labels = False
 
-                # קיבוע ידני של מיקום המפה והשוליים - מונע קריסה בשחור-לבן
+                # קיבוע קשיח של השוליים והכותרת במקום
                 fig.subplots_adjust(top=0.88, bottom=0.15, left=0.05, right=0.95)
                 fig.suptitle(title_text, fontsize=14, weight='bold', x=0.06, y=0.96, ha='left')
                 
