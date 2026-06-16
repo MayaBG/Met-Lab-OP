@@ -89,8 +89,7 @@ if st.sidebar.button("הפק מפה"):
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
                     ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=5.5, color='#1b3a4b', linewidth=0.9, zorder=3)
                     
-                    title_text = f"Surface MSLP (hPa) & Wind Barbs\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
-                    plt.title(title_text, fontsize=13, pad=18, weight='bold')
+                    title_text = f"Surface MSLP (hPa) & 10m Wind Barbs\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
                 # --- בניית מפת 850mb ---
                 elif map_type == '850mb':
@@ -99,7 +98,7 @@ if st.sidebar.button("הפק מפה"):
                         {
                             'product_type': 'reanalysis',
                             'format': 'netcdf',
-                            'variable': 'temperature',
+                            'variable': ['temperature'],
                             'pressure_level': '850',
                             'year': str(year),
                             'month': f"{month:02d}",
@@ -121,8 +120,7 @@ if st.sidebar.button("הפק מפה"):
                     cntr = ax.contour(temp_data.longitude, temp_data.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.2, zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
                     
-                    title_text = f"850hPa Temperature (°C)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
-                    plt.title(title_text, fontsize=13, pad=18, weight='bold')
+                    title_text = f"850hPa Temperature (°C)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
                 # --- בניית מפת 500mb ---
                 elif map_type == '500mb':
@@ -131,7 +129,7 @@ if st.sidebar.button("הפק מפה"):
                         {
                             'product_type': 'reanalysis',
                             'format': 'netcdf',
-                            'variable': 'geopotential',
+                            'variable': ['geopotential'],
                             'pressure_level': '500',
                             'year': str(year),
                             'month': f"{month:02d}",
@@ -153,10 +151,9 @@ if st.sidebar.button("הפק מפה"):
                     cntr = ax.contour(hgt.longitude, hgt.latitude, hgt_smoothed, colors='white', linewidths=1.6, levels=np.arange(5100, 6000, 60), zorder=2)
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
                     
-                    title_text = f"500hPa Geopotential Height (m)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC\nSource: ECMWF ERA5 Reanalysis"
-                    plt.title(title_text, fontsize=13, pad=18, weight='bold')
+                    title_text = f"500hPa Geopotential Height (m)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
-                # --- שכבה גאוגרפית משותפת (מתבצעת בסוף הבלוק בצורה נקייה) ---
+                # --- שכבה גאוגרפית משותפת לכל המפלסים ---
                 ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.2, edgecolor='black', zorder=4)
                 ax.add_feature(cfeature.BORDERS, linestyle=':', linewidth=1.0, edgecolor='#2c3e50', zorder=4)
                 
@@ -164,8 +161,10 @@ if st.sidebar.button("הפק מפה"):
                 gl.top_labels = False
                 gl.right_labels = False
 
-                # הפיכת השוליים העליונים לקשיחים כדי שהכותרת לא תיחתך לעולם
+                # כתיבת כותרת קשיחה בתוך התמונה משמאל למניעת היעלמות בגלל RTL דפדפני
+                fig.suptitle(title_text, fontsize=14, weight='bold', x=0.12, y=0.96, ha='left')
                 fig.subplots_adjust(top=0.88, bottom=0.15)
+                
                 st.pyplot(fig)
                 
                 ds.close()
