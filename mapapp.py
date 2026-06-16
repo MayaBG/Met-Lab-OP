@@ -13,7 +13,6 @@ from scipy.ndimage import gaussian_filter
 # הגדרות עמוד של Streamlit
 st.set_page_config(page_title="מעבדה מטאורולוגית", layout="wide")
 
-# קוד CSS עדין וממוקד למניעת שבירת ממשק
 st.markdown(
     """
     <style>
@@ -36,7 +35,6 @@ st.markdown(
 st.title("🌍 מחולל מפות סינופטיות - מעבדה")
 st.markdown("### מערכת הפקת מפות מבוססת נתוני ריאנליזה גלובלית ERA5 (ECMWF הרשמי)")
 
-# סרגל צד להגדרות המשתמש
 st.sidebar.header("הגדרות הפקה")
 
 year = st.sidebar.slider("שנה", 1979, 2026, 2026)
@@ -75,25 +73,39 @@ if st.sidebar.button("הפק מפה"):
                     
                     ds = xr.open_dataset(temp_filename).sortby('latitude')
                     
-                    slp = ds['msl'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 100.0
-                    u = ds['u10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
-                    v = ds['v10'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
+                    # זיהוי דינמי ובטוח של שמות המשתנים
+                    msl_var = [v for v in ds.data_vars if 'msl' in v.lower() or 'press' in v.lower()][0]
+                    u_var = [v for v in ds.data_vars if 'u' in v.lower()][0]
+                    v_var = [v for v in ds.data_vars if 'v' in v.lower()][0]
+                    
+                    slp = ds[msl_var].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
+                    if slp.max() > 2000:  # המרה לפסקל אם צריך
+                        slp = slp / 100.0
+                        
+                    u = ds[u_var].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
+                    v = ds[v_var].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze()
                     slp_smoothed = gaussian_filter(slp.values, sigma=1.2)
+                    
+                    # יצירת רשת קואורדינטות מלאה כדי למנוע קריסה של דגלוני הרוח
+                    lons, lats = np.meshgrid(slp.longitude.values, slp.latitude.values)
                     
                     fig = plt.figure(figsize=(14, 11))
                     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
                     ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    # הפתרון למניעת קריסת המפה בסטריםלייט: יצירת יבשה וים פיזיים שמחזיקים את הגבולות פתוחים
-                    ax.add_feature(cfeature.LAND, facecolor='#eaeaea', zorder=0)
+                    # --- טריק העיגון! שתי נקודות שקופות בפינות שמכריחות את המפה להישאר פתוחה ---
+                    ax.plot([20, 50], [20, 40], '.', alpha=0.0, transform=ccrs.PlateCarree())
+                    
+                    ax.add_feature(cfeature.LAND, facecolor='#f5f5f5', zorder=0)
                     ax.add_feature(cfeature.OCEAN, facecolor='#ffffff', zorder=0)
                     
-                    # קווי לחץ שחורים וברורים
-                    cntr = ax.contour(slp.longitude, slp.latitude, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.6, zorder=2)
+                    # קווי לחץ
+                    cntr = ax.contour(lons, lats, slp_smoothed, colors='black', levels=np.arange(980, 1040, 2), linewidths=1.6, zorder=2, transform=ccrs.PlateCarree())
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=11)
                     
                     # דגלוני רוח
-                    ax.barbs(u.longitude[::5], u.latitude[::5], u.values[::5, ::5], v.values[::5, ::5], length=6.0, color='black', linewidth=1.1, zorder=3)
+                    skip = 5
+                    ax.barbs(lons[::skip, ::skip], lats[::skip, ::skip], u.values[::skip, ::skip], v.values[::skip, ::skip], length=6.0, color='black', linewidth=1.1, zorder=3, transform=ccrs.PlateCarree())
                     
                     title_text = f"Surface MSLP (hPa) & 10m Wind Barbs\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
@@ -114,16 +126,19 @@ if st.sidebar.button("הפק מפה"):
                         temp_filename)
                     
                     ds = xr.open_dataset(temp_filename).sortby('latitude')
-                    temp_data = ds['t'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() - 273.15
+                    t_var = [v for v in ds.data_vars if 't' in v.lower()][0]
+                    
+                    temp_data = ds[t_var].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() - 273.15
                     temp_smoothed = gaussian_filter(temp_data.values, sigma=1.5)
+                    lons, lats = np.meshgrid(temp_data.longitude.values, temp_data.latitude.values)
                     
                     fig = plt.figure(figsize=(14, 11))
                     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
                     ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    cf = ax.contourf(temp_data.longitude, temp_data.latitude, temp_data, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=1)
+                    cf = ax.contourf(lons, lats, temp_data, cmap='coolwarm', levels=np.arange(-15, 35, 2), extend='both', zorder=1, transform=ccrs.PlateCarree())
                     plt.colorbar(cf, label='Temperature (°C)', orientation='horizontal', pad=0.08, aspect=40)
-                    cntr = ax.contour(temp_data.longitude, temp_data.latitude, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.2, zorder=2)
+                    cntr = ax.contour(lons, lats, temp_smoothed, colors='black', levels=np.arange(-15, 35, 2), linewidths=1.2, zorder=2, transform=ccrs.PlateCarree())
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
                     
                     title_text = f"850hPa Temperature (°C)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
@@ -145,21 +160,24 @@ if st.sidebar.button("הפק מפה"):
                         temp_filename)
                     
                     ds = xr.open_dataset(temp_filename).sortby('latitude')
-                    hgt = ds['z'].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 9.80665
+                    z_var = [v for v in ds.data_vars if 'z' in v.lower() or 'geo' in v.lower()][0]
+                    
+                    hgt = ds[z_var].sel(latitude=slice(20, 40), longitude=slice(20, 50)).squeeze() / 9.80665
                     hgt_smoothed = gaussian_filter(hgt.values, sigma=1.2)
+                    lons, lats = np.meshgrid(hgt.longitude.values, hgt.latitude.values)
                     
                     fig = plt.figure(figsize=(14, 11))
                     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
                     ax.set_extent([20, 50, 20, 40], crs=ccrs.PlateCarree())
                     
-                    cf = ax.contourf(hgt.longitude, hgt.latitude, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=1)
+                    cf = ax.contourf(lons, lats, hgt, cmap='viridis', levels=np.arange(5100, 6000, 60), extend='both', zorder=1, transform=ccrs.PlateCarree())
                     plt.colorbar(cf, label='Geopotential Height (m)', orientation='horizontal', pad=0.08, aspect=40)
-                    cntr = ax.contour(hgt.longitude, hgt.latitude, hgt_smoothed, colors='white', linewidths=1.6, levels=np.arange(5100, 6000, 60), zorder=2)
+                    cntr = ax.contour(lons, lats, hgt_smoothed, colors='white', linewidths=1.6, levels=np.arange(5100, 6000, 60), zorder=2, transform=ccrs.PlateCarree())
                     ax.clabel(cntr, inline=True, fmt='%i', fontsize=10)
                     
                     title_text = f"500hPa Geopotential Height (m)\nValid for: {target_dt.strftime('%Y-%m-%d %H:00')} UTC | Source: ECMWF ERA5 Reanalysis"
 
-                # --- שכבה גאוגרפית משותפת ---
+                # --- שכבה גאוגרפית משותפת לכל המפלסים ---
                 ax.add_feature(cfeature.COASTLINE.with_scale('50m'), linewidth=1.3, edgecolor='black', zorder=4)
                 ax.add_feature(cfeature.BORDERS, linestyle=':', linewidth=1.0, edgecolor='#444444', zorder=4)
                 
